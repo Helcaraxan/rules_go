@@ -5,7 +5,10 @@ test_suite(name = "go_path")
 [go_path(
     name = mode + "_path",
     testonly = True,
-    data = ["extra.txt"],
+    data = [
+        "extra.txt",
+        ":datafiles",
+    ],
     include_pkg = True,
     mode = mode,
     deps = [
@@ -44,4 +47,10 @@ go_test(
     ],
     deps = ["//go/tools/bazel:go_default_library"],
     rundir = ".",
+)
+
+filegroup(
+    name = "datafiles",
+    srcs = glob(['data/**']),
+    visibility = [":__subpackages__"],
 )

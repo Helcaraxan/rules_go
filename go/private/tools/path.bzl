@@ -58,6 +58,7 @@ def _go_path_impl(ctx):
                 srcs = as_list(archive.orig_srcs),
                 data = as_list(archive.data_files),
                 pkgs = {mode: archive.file},
+                label = archive.label,
             )
             if pkgpath in pkg_map:
                 _merge_pkg(pkg_map[pkgpath], pkg)
@@ -70,7 +71,7 @@ def _go_path_impl(ctx):
     manifest_entry_map = {}
     for pkg in pkg_map.values():
         for f in pkg.srcs:
-            dst = pkg.dir + "/" + f.basename
+            dst = _target_path(pkg.dir, f, pkg.label)
             _add_manifest_entry(manifest_entries, manifest_entry_map, inputs, f, dst)
     if ctx.attr.include_pkg:
         for pkg in pkg_map.values():
@@ -87,15 +88,16 @@ def _go_path_impl(ctx):
                     i = parts.index("testdata")
                     dst = pkg.dir + "/" + "/".join(parts[i:])
                 else:
-                    dst = pkg.dir + "/" + f.basename
+                    dst = _target_path(pkg.dir, f, pkg.label)
                 _add_manifest_entry(manifest_entries, manifest_entry_map, inputs, f, dst)
     for f in ctx.files.data:
+        dst = _target_path(".", f, ctx.label)
         _add_manifest_entry(
             manifest_entries,
             manifest_entry_map,
             inputs,
             f,
-            f.basename,
+            dst,
         )
     manifest_file = ctx.actions.declare_file(ctx.label.name + "~manifest")
     manifest_entries_json = [e.to_json() for e in manifest_entries]
@@ -190,3 +192,11 @@ def _add_manifest_entry(entries, entry_map, inputs, src, dst):
     entries.append(struct(src = src.path, dst = dst))
     entry_map[dst] = src.path
     inputs.append(src)
+
+def _target_path(pkgdir, f, label):
+    if not f.short_path.startswith(label.package):
+        # Return something sane if there is a path mismatch (should not happen but hey...).
+        return pkgdir + f.basename
+
+    rel_filepath = f.short_path[len(label.package)+1:]
+    return pkgdir + "/" + rel_filepath
